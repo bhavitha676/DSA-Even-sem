@@ -1,0 +1,1050 @@
+import java.util.*;
+import java.util.stream.*;
+
+public class LocalPulse {
+
+    // ============================================================
+    // CO2 | ADT DESIGN - Event Entity (core data model)
+    // ============================================================
+    static class Event {
+        int     id;
+        String  name;
+        String  category;   // music, gaming, sports, education, arts
+        String  city;
+        String  date;       // "YYYY-MM-DD"
+        int     price;      // 0 = FREE
+        int     capacity;
+        String  organizer;
+        boolean featured;
+
+        Event(int id, String name, String category, String city,
+              String date, int price, int capacity, String organizer, boolean featured) {
+            this.id        = id;
+            this.name      = name;
+            this.category  = category;
+            this.city      = city;
+            this.date      = date;
+            this.price     = price;
+            this.capacity  = capacity;
+            this.organizer = organizer;
+            this.featured  = featured;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("[%2d] %-38s | %-10s | %-10s | %s | %s",
+                id, name, category, city, date,
+                price == 0 ? "FREE" : "Rs." + price);
+        }
+    }
+
+    // ============================================================
+    // CO1 | LINEAR SEARCH  O(n)
+    // ============================================================
+    static int linearSearch(Event[] arr, int targetId) {
+        for (int i = 0; i < arr.length; i++)
+            if (arr[i].id == targetId) return i;
+        return -1;
+    }
+
+    // ============================================================
+    // CO1 | BINARY SEARCH  O(log n)  [array sorted by id]
+    // ============================================================
+    static int binarySearch(Event[] arr, int targetId) {
+        int lo = 0, hi = arr.length - 1;
+        while (lo <= hi) {
+            int mid = lo + (hi - lo) / 2;
+            if      (arr[mid].id == targetId) return mid;
+            else if (arr[mid].id <  targetId) lo = mid + 1;
+            else                              hi = mid - 1;
+        }
+        return -1;
+    }
+
+    // ============================================================
+    // CO1 | BUBBLE SORT  O(n^2) - by price ascending
+    // ============================================================
+    static void bubbleSort(Event[] arr) {
+        int n = arr.length;
+        for (int i = 0; i < n - 1; i++) {
+            boolean swapped = false;
+            for (int j = 0; j < n - 1 - i; j++) {
+                if (arr[j].price > arr[j + 1].price) {
+                    Event tmp = arr[j]; arr[j] = arr[j + 1]; arr[j + 1] = tmp;
+                    swapped = true;
+                }
+            }
+            if (!swapped) break;
+        }
+    }
+
+    // ============================================================
+    // CO1 | SELECTION SORT  O(n^2) - by name alphabetically
+    // ============================================================
+    static void selectionSort(Event[] arr) {
+        int n = arr.length;
+        for (int i = 0; i < n - 1; i++) {
+            int minIdx = i;
+            for (int j = i + 1; j < n; j++)
+                if (arr[j].name.compareTo(arr[minIdx].name) < 0) minIdx = j;
+            Event tmp = arr[minIdx]; arr[minIdx] = arr[i]; arr[i] = tmp;
+        }
+    }
+
+    // ============================================================
+    // CO1 | INSERTION SORT  O(n^2) avg, O(n) best - by date
+    // ============================================================
+    static void insertionSort(Event[] arr) {
+        int n = arr.length;
+        for (int i = 1; i < n; i++) {
+            Event key = arr[i];
+            int j = i - 1;
+            while (j >= 0 && arr[j].date.compareTo(key.date) > 0) {
+                arr[j + 1] = arr[j]; j--;
+            }
+            arr[j + 1] = key;
+        }
+    }
+
+    // ============================================================
+    // CO1 | MERGE SORT  Theta(n log n) - by capacity descending
+    // ============================================================
+    static void mergeSort(Event[] arr, int lo, int hi) {
+        if (lo < hi) {
+            int mid = (lo + hi) / 2;
+            mergeSort(arr, lo, mid);
+            mergeSort(arr, mid + 1, hi);
+            merge(arr, lo, mid, hi);
+        }
+    }
+    static void merge(Event[] arr, int lo, int mid, int hi) {
+        int n1 = mid - lo + 1, n2 = hi - mid;
+        Event[] L = new Event[n1], R = new Event[n2];
+        System.arraycopy(arr, lo,      L, 0, n1);
+        System.arraycopy(arr, mid + 1, R, 0, n2);
+        int i = 0, j = 0, k = lo;
+        while (i < n1 && j < n2)
+            arr[k++] = (L[i].capacity >= R[j].capacity) ? L[i++] : R[j++];
+        while (i < n1) arr[k++] = L[i++];
+        while (j < n2) arr[k++] = R[j++];
+    }
+
+    // ============================================================
+    // CO1 | QUICK SORT  O(n log n) avg - by id ascending
+    // ============================================================
+    static void quickSort(Event[] arr, int lo, int hi) {
+        if (lo < hi) {
+            int p = partition(arr, lo, hi);
+            quickSort(arr, lo, p - 1);
+            quickSort(arr, p + 1, hi);
+        }
+    }
+    static int partition(Event[] arr, int lo, int hi) {
+        int pivot = arr[hi].id, i = lo - 1;
+        for (int j = lo; j < hi; j++) {
+            if (arr[j].id <= pivot) {
+                i++;
+                Event tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+            }
+        }
+        Event tmp = arr[i + 1]; arr[i + 1] = arr[hi]; arr[hi] = tmp;
+        return i + 1;
+    }
+
+    // ============================================================
+    // CO1 | EMPIRICAL TIME MEASUREMENT
+    // ============================================================
+    static void measureSortTime(Event[] arr, String label) {
+        Event[] copy = arr.clone();
+        long start = System.nanoTime();
+        insertionSort(copy);
+        long end = System.nanoTime();
+        System.out.printf("  %-18s sort time: %6d us  (n=%d)%n",
+            label, (end - start) / 1000, copy.length);
+    }
+
+    // ============================================================
+    // CO2 | SINGLY LINKED LIST - Event Catalog
+    // ============================================================
+    static class SinglyLinkedList {
+        static class Node {
+            Event data; Node next;
+            Node(Event e) { data = e; }
+        }
+        Node head;
+        int  size;
+
+        void insertEnd(Event e) {
+            Node n = new Node(e);
+            if (head == null) { head = n; size++; return; }
+            Node cur = head;
+            while (cur.next != null) cur = cur.next;
+            cur.next = n; size++;
+        }
+
+        boolean deleteById(int id) {
+            if (head == null) return false;
+            if (head.data.id == id) { head = head.next; size--; return true; }
+            Node cur = head;
+            while (cur.next != null) {
+                if (cur.next.data.id == id) { cur.next = cur.next.next; size--; return true; }
+                cur = cur.next;
+            }
+            return false;
+        }
+
+        List<Event> searchByCity(String city) {
+            List<Event> res = new ArrayList<>();
+            Node cur = head;
+            while (cur != null) {
+                if (cur.data.city.equalsIgnoreCase(city)) res.add(cur.data);
+                cur = cur.next;
+            }
+            return res;
+        }
+
+        void traverse() {
+            Node cur = head;
+            while (cur != null) { System.out.println("  " + cur.data); cur = cur.next; }
+        }
+
+        void reverse() {
+            Node prev = null, cur = head, next;
+            while (cur != null) { next = cur.next; cur.next = prev; prev = cur; cur = next; }
+            head = prev;
+        }
+
+        boolean hasCycle() {
+            Node slow = head, fast = head;
+            while (fast != null && fast.next != null) {
+                slow = slow.next; fast = fast.next.next;
+                if (slow == fast) return true;
+            }
+            return false;
+        }
+    }
+
+    // ============================================================
+    // CO2 | DOUBLY LINKED LIST - Browsing History
+    // ============================================================
+    static class DoublyLinkedList {
+        static class Node {
+            Event data; Node prev, next;
+            Node(Event e) { data = e; }
+        }
+        Node head, tail;
+
+        void addToHistory(Event e) {
+            Node n = new Node(e);
+            if (tail == null) { head = tail = n; return; }
+            tail.next = n; n.prev = tail; tail = n;
+        }
+
+        void traverse() {
+            Node cur = head;
+            if (cur == null) { System.out.println("  (empty)"); return; }
+            System.out.print("  History: ");
+            while (cur != null) {
+                System.out.print(cur.data.name + (cur.next != null ? " -> " : ""));
+                cur = cur.next;
+            }
+            System.out.println();
+        }
+    }
+
+    // ============================================================
+    // CO2 | CIRCULAR LINKED LIST - Featured Events Carousel
+    // ============================================================
+    static class CircularLinkedList {
+        static class Node { Event data; Node next; Node(Event e) { data = e; } }
+        Node tail;
+
+        void insert(Event e) {
+            Node n = new Node(e);
+            if (tail == null) { tail = n; n.next = n; return; }
+            n.next = tail.next; tail.next = n; tail = n;
+        }
+
+        void display(int steps) {
+            if (tail == null) { System.out.println("  No featured events."); return; }
+            Node cur = tail.next;
+            for (int i = 0; i < steps; i++) {
+                System.out.println("  [FEATURED] " + cur.data.name + " (" + cur.data.city + ") | " +
+                    (cur.data.price == 0 ? "FREE" : "Rs." + cur.data.price));
+                cur = cur.next;
+            }
+        }
+    }
+
+    // ============================================================
+    // CO3 | STACK - Navigation / Undo History
+    // ============================================================
+    static class EventStack {
+        private Event[] stack;
+        private int top;
+        EventStack(int cap) { stack = new Event[cap]; top = -1; }
+
+        boolean push(Event e) {
+            if (top == stack.length - 1) return false;
+            stack[++top] = e; return true;
+        }
+        Event pop()  { return top == -1 ? null : stack[top--]; }
+        Event peek() { return top == -1 ? null : stack[top]; }
+        boolean isEmpty() { return top == -1; }
+        int size()        { return top + 1; }
+    }
+
+    // ============================================================
+    // CO3 | CIRCULAR QUEUE - Registration Queue
+    // ============================================================
+    static class CircularQueue {
+        private String[] q;
+        private int front, rear, size, capacity;
+
+        CircularQueue(int cap) {
+            capacity = cap; q = new String[cap]; front = 0; rear = 0; size = 0;
+        }
+        boolean enqueue(String name) {
+            if (size == capacity) return false;
+            q[rear] = name; rear = (rear + 1) % capacity; size++; return true;
+        }
+        String dequeue() {
+            if (size == 0) return null;
+            String val = q[front]; front = (front + 1) % capacity; size--; return val;
+        }
+        boolean isEmpty() { return size == 0; }
+        int     getSize() { return size; }
+    }
+
+    // ============================================================
+    // CO3 | DEQUE - Recent & Upcoming Events
+    // ============================================================
+    static class EventDeque {
+        private LinkedList<Event> deque = new LinkedList<>();
+        void addRecent(Event e)   { deque.addFirst(e); }
+        void addUpcoming(Event e) { deque.addLast(e);  }
+        void display() {
+            System.out.println("  Deque contents:");
+            for (Event e : deque) System.out.println("    " + e);
+        }
+    }
+
+    // ============================================================
+    // CO3 | MAX-HEAP - Top-Capacity Events
+    // ============================================================
+    static class MaxHeapByCapacity {
+        private Event[] heap;
+        private int n;
+        MaxHeapByCapacity(int cap) { heap = new Event[cap]; }
+
+        void insert(Event e) { heap[n++] = e; siftUp(n - 1); }
+
+        Event extractMax() {
+            if (n == 0) return null;
+            Event max = heap[0]; heap[0] = heap[--n]; siftDown(0); return max;
+        }
+        private void siftUp(int i) {
+            while (i > 0) {
+                int p = (i - 1) / 2;
+                if (heap[p].capacity >= heap[i].capacity) break;
+                Event tmp = heap[p]; heap[p] = heap[i]; heap[i] = tmp; i = p;
+            }
+        }
+        private void siftDown(int i) {
+            while (2 * i + 1 < n) {
+                int largest = i, l = 2*i+1, r = 2*i+2;
+                if (l < n && heap[l].capacity > heap[largest].capacity) largest = l;
+                if (r < n && heap[r].capacity > heap[largest].capacity) largest = r;
+                if (largest == i) break;
+                Event tmp = heap[i]; heap[i] = heap[largest]; heap[largest] = tmp; i = largest;
+            }
+        }
+        int size() { return n; }
+    }
+
+    // ============================================================
+    // CO3 | MIN-HEAP via PriorityQueue - Cheapest Events First
+    // ============================================================
+    static PriorityQueue<Event> buildMinHeapByPrice(Event[] events) {
+        PriorityQueue<Event> pq = new PriorityQueue<>(Comparator.comparingInt(e -> e.price));
+        for (Event e : events) pq.offer(e);
+        return pq;
+    }
+
+    // ============================================================
+    // CO4 | HASH TABLE WITH CHAINING - Lookup by City
+    // ============================================================
+    static class HashTableChaining {
+        private static final int INITIAL_CAPACITY = 16;
+        private LinkedList<Event>[] table;
+        private int size;
+
+        @SuppressWarnings("unchecked")
+        HashTableChaining() {
+            table = new LinkedList[INITIAL_CAPACITY];
+            for (int i = 0; i < INITIAL_CAPACITY; i++) table[i] = new LinkedList<>();
+        }
+        private int hash(String key) {
+            int h = 0;
+            for (char c : key.toLowerCase().toCharArray()) h = 31 * h + c;
+            return Math.abs(h % table.length);
+        }
+        void put(Event e)  { table[hash(e.city)].add(e); size++; }
+        List<Event> get(String city) {
+            List<Event> res = new ArrayList<>();
+            for (Event e : table[hash(city)])
+                if (e.city.equalsIgnoreCase(city)) res.add(e);
+            return res;
+        }
+        void printStats() {
+            int occupied = 0, maxChain = 0;
+            for (LinkedList<Event> b : table) {
+                if (!b.isEmpty()) occupied++;
+                maxChain = Math.max(maxChain, b.size());
+            }
+            System.out.printf("  HashTable (chaining): buckets=%d, occupied=%d, maxChain=%d, load=%.2f%n",
+                table.length, occupied, maxChain, (double) size / table.length);
+        }
+    }
+
+    // ============================================================
+    // CO4 | HASH TABLE OPEN ADDRESSING - Lookup by ID
+    // ============================================================
+    static class HashTableOpenAddressing {
+        private Event[] table;
+        private int capacity, size;
+        private final Event DELETED = new Event(-1, "", "", "", "", -1, -1, "", false);
+
+        HashTableOpenAddressing(int cap) { capacity = cap; table = new Event[cap]; }
+        private int hash(int id) { return id % capacity; }
+        void put(Event e) {
+            int idx = hash(e.id), probe = 0;
+            while (table[(idx+probe)%capacity] != null
+                && table[(idx+probe)%capacity] != DELETED
+                && table[(idx+probe)%capacity].id != e.id) probe++;
+            table[(idx+probe)%capacity] = e; size++;
+        }
+        Event get(int id) {
+            int idx = hash(id), probe = 0;
+            while (table[(idx+probe)%capacity] != null) {
+                Event cur = table[(idx+probe)%capacity];
+                if (cur != DELETED && cur.id == id) return cur;
+                probe++;
+            }
+            return null;
+        }
+        double loadFactor() { return (double) size / capacity; }
+    }
+
+    // ============================================================
+    // CO5 | CATEGORY FILTER using LinkedList
+    // ============================================================
+    static List<Event> filterByCategory(Event[] events, String category) {
+        List<Event> result = new LinkedList<>();
+        for (Event e : events)
+            if (e.category.equalsIgnoreCase(category)) result.add(e);
+        return result;
+    }
+
+    // ============================================================
+    // CO5 | PRICE RANGE FILTER using Binary Search boundaries
+    // ============================================================
+    static List<Event> priceRangeFilter(Event[] sortedByPrice, int minPrice, int maxPrice) {
+        List<Event> res = new ArrayList<>();
+        int lo = 0, hi = sortedByPrice.length - 1, start = sortedByPrice.length;
+        while (lo <= hi) {
+            int mid = (lo + hi) / 2;
+            if (sortedByPrice[mid].price >= minPrice) { start = mid; hi = mid - 1; }
+            else lo = mid + 1;
+        }
+        for (int i = start; i < sortedByPrice.length && sortedByPrice[i].price <= maxPrice; i++)
+            res.add(sortedByPrice[i]);
+        return res;
+    }
+
+    // ============================================================
+    // CO5 | TOP-K BY CAPACITY using Max-Heap
+    // ============================================================
+    static void topKByCapacity(Event[] events, int k) {
+        MaxHeapByCapacity heap = new MaxHeapByCapacity(events.length);
+        for (Event e : events) heap.insert(e);
+        System.out.println("  Top-" + k + " Events by Capacity [Max-Heap - O(n log k)]:");
+        for (int i = 0; i < k && heap.size() > 0; i++) {
+            Event e = heap.extractMax();
+            System.out.printf("  #%d  %-38s  Capacity: %,d%n", i+1, e.name, e.capacity);
+        }
+    }
+
+    // ============================================================
+    // PRINT HELPERS
+    // ============================================================
+    static void printMenu() {
+        System.out.println();
+        System.out.println("MAIN MENU");
+        System.out.println("---------");
+        System.out.println("1. View All Events");
+        System.out.println("2. Search Event by ID");
+        System.out.println("3. Register for Event");
+        System.out.println("4. View Registrations for Event");
+        System.out.println("5. Sort Events");
+        System.out.println("6. Filter Events");
+        System.out.println("7. Undo Last Action");
+        System.out.println("8. Featured Events Carousel");
+        System.out.println("9. View Browsing History");
+        System.out.println("10. Top Events by Capacity");
+        System.out.println("11. Cheapest Events (Min-Heap)");
+        System.out.println("12. DSA Summary & Stats");
+        System.out.println("0. Exit");
+        System.out.println();
+        System.out.print("Enter choice: ");
+    }
+
+    static void line() {
+        System.out.println("--------------------------------------------------");
+    }
+
+    // ============================================================
+    // MAIN
+    // ============================================================
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+
+        // ── Dataset ──────────────────────────────────────────────
+        Event[] EVENTS = {
+            new Event( 1, "Sunburn Festival",               "music",     "Mumbai",    "2025-09-12", 1500, 20000, "Percept Live",           true),
+            new Event( 2, "India Gaming Expo (IGX)",        "gaming",    "Mumbai",    "2025-09-20",  499, 15000, "IGX India",              false),
+            new Event( 3, "Pro Kabaddi Fan Fiesta",         "sports",    "Hyderabad", "2025-09-25",  200,  8000, "Star Sports & PKL",      false),
+            new Event( 4, "TechSpark AI Workshop",          "education", "Bengaluru", "2025-09-28",    0,   300, "TiE Bengaluru",          true),
+            new Event( 5, "Kala Ghoda Arts Festival",       "arts",      "Mumbai",    "2025-10-04",    0,  9999, "Kala Ghoda Assoc.",      false),
+            new Event( 6, "Lata Mangeshkar Music Night",    "music",     "Delhi",     "2025-10-08",  800,  3000, "Spic Macay",             false),
+            new Event( 7, "ISRO Space Science Seminar",     "education", "Bengaluru", "2025-10-12",  100,   500, "ISRO / DST India",       true),
+            new Event( 8, "IPL Fan T20 Charity Match",      "sports",    "Chennai",   "2025-10-18",    0, 25000, "BCCI & CSK Trust",       false),
+            new Event( 9, "Hyderabad Comic Con",            "gaming",    "Hyderabad", "2025-10-22",  599, 10000, "Comic Con India",        false),
+            new Event(10, "Warli & Madhubani Workshop",     "arts",      "Delhi",     "2025-10-30",  350,   150, "Craftroots India",       false),
+            new Event(11, "Pune Jazz & Blues Festival",     "music",     "Pune",      "2025-11-02",  700,  5000, "Blue Note Events",       true),
+            new Event(12, "VR & Metaverse Expo",            "gaming",    "Bengaluru", "2025-11-05",  399,  8000, "TechVerse India",        false),
+            new Event(13, "Mumbai Marathon 2025",           "sports",    "Mumbai",    "2025-11-09",    0, 55000, "Procam International",   true),
+            new Event(14, "Indian Classical Dance Fest",    "arts",      "Chennai",   "2025-11-14",  250,  1200, "Kalakshetra Foundation", false),
+            new Event(15, "Python & Data Science Bootcamp", "education", "Hyderabad", "2025-11-18",  499,   200, "DataHack India",         false),
+            new Event(16, "Kolkata Book Fair",              "education", "Kolkata",   "2025-11-22",    0,  9999, "Publishers Guild",       true),
+            new Event(17, "Esports Championship India",     "gaming",    "Mumbai",    "2025-11-26",  299, 12000, "ESI & Nodwin Gaming",    true),
+            new Event(18, "Goa Carnival & Street Art Fest", "arts",      "Goa",       "2025-12-05",    0,  9999, "Goa Tourism Board",      false),
+            new Event(19, "Delhi Half Marathon",            "sports",    "Delhi",     "2025-12-10",  150, 35000, "Procam International",   false),
+            new Event(20, "New Year's Eve Music Countdown", "music",     "Mumbai",    "2025-12-31",    0,  9999, "BMC & MTDC",             true),
+        };
+
+        // ── Build all data structures from dataset ────────────────
+        SinglyLinkedList   catalog  = new SinglyLinkedList();
+        DoublyLinkedList   history  = new DoublyLinkedList();
+        CircularLinkedList carousel = new CircularLinkedList();
+        EventStack         undoStack = new EventStack(50);
+        HashTableChaining  cityMap   = new HashTableChaining();
+        HashTableOpenAddressing htoa = new HashTableOpenAddressing(37);
+
+        for (Event e : EVENTS) {
+            catalog.insertEnd(e);
+            cityMap.put(e);
+            htoa.put(e);
+            if (e.featured) carousel.insert(e);
+        }
+
+        // Sorted-by-id copy for binary search
+        Event[] sortedById = EVENTS.clone();
+        quickSort(sortedById, 0, sortedById.length - 1);
+
+        // Registration store: eventId -> list of user names
+        Map<Integer, List<String>> registrations = new HashMap<>();
+        for (Event e : EVENTS) registrations.put(e.id, new ArrayList<>());
+
+        // ── Welcome ───────────────────────────────────────────────
+        System.out.println("==================================================");
+        System.out.println("   LOCAL PULSE - Event Discovery & Management");
+        System.out.println("==================================================");
+        System.out.print("Enter your name: ");
+        String user = sc.nextLine().trim();
+        if (user.isEmpty()) user = "Guest";
+        System.out.println("Welcome, " + user + "!");
+
+        // ── Main Menu Loop ────────────────────────────────────────
+        boolean running = true;
+        while (running) {
+            printMenu();
+            String inp = sc.nextLine().trim();
+            int choice;
+            try { choice = Integer.parseInt(inp); }
+            catch (NumberFormatException e) { choice = -1; }
+
+            switch (choice) {
+
+                // ── 1. View All Events ────────────────────────────
+                case 1: {
+                    line();
+                    System.out.println("ALL EVENTS  [SinglyLinkedList traversal - O(n)]");
+                    line();
+                    catalog.traverse();
+                    line();
+                    break;
+                }
+
+                // ── 2. Search Event by ID ─────────────────────────
+                case 2: {
+                    line();
+                    System.out.println("SEARCH EVENT BY ID");
+                    line();
+                    System.out.print("Enter Event ID (1-20): ");
+                    try {
+                        int id = Integer.parseInt(sc.nextLine().trim());
+                        int bi = binarySearch(sortedById, id);
+                        if (bi >= 0) {
+                            Event found = sortedById[bi];
+                            System.out.println("Found [Binary Search - O(log n)]:");
+                            System.out.println("  " + found);
+                            System.out.println("  Organizer: " + found.organizer);
+                            System.out.println("  Capacity : " + found.capacity);
+                            history.addToHistory(found);
+                            undoStack.push(found);
+                        } else {
+                            int li = linearSearch(EVENTS, id);
+                            if (li >= 0) {
+                                System.out.println("Found [Linear Search - O(n)]:");
+                                System.out.println("  " + EVENTS[li]);
+                                history.addToHistory(EVENTS[li]);
+                                undoStack.push(EVENTS[li]);
+                            } else {
+                                System.out.println("No event found with ID = " + id);
+                            }
+                        }
+                    } catch (NumberFormatException e) {
+                        System.out.println("Invalid input. Please enter a number.");
+                    }
+                    line();
+                    break;
+                }
+
+                // ── 3. Register for Event ─────────────────────────
+                case 3: {
+                    line();
+                    System.out.println("REGISTER FOR EVENT");
+                    line();
+
+                    // ── STEP 1: Show numbered event list ──────────
+                    System.out.println("STEP 1: Select an Event");
+                    line();
+                    System.out.printf("  %-4s %-40s %-11s %-12s %-12s %s%n",
+                        "No.", "Event Name", "Category", "City", "Date", "Price");
+                    line();
+                    for (int i = 0; i < EVENTS.length; i++) {
+                        Event e = EVENTS[i];
+                        System.out.printf("  %-4d %-40s %-11s %-12s %-12s %s%n",
+                            (i + 1), e.name, e.category, e.city, e.date,
+                            e.price == 0 ? "FREE" : "Rs." + e.price);
+                    }
+                    line();
+                    System.out.print("Enter choice (1-" + EVENTS.length + ") or 0 to cancel: ");
+
+                    try {
+                        int choice3 = Integer.parseInt(sc.nextLine().trim());
+
+                        if (choice3 == 0) {
+                            System.out.println("  Registration cancelled.");
+                            line();
+                            break;
+                        }
+                        if (choice3 < 1 || choice3 > EVENTS.length) {
+                            System.out.println("  [!] Invalid choice. Enter 1 to " + EVENTS.length + ".");
+                            line();
+                            break;
+                        }
+
+                        // Map choice to Event using Linear Search O(n)
+                        Event ev  = EVENTS[choice3 - 1];
+                        int   id  = ev.id;
+                        List<String> regs = registrations.get(id);
+                        int seatsLeft = ev.capacity - regs.size();
+
+                        // ── STEP 2: Show Event Details ────────────
+                        line();
+                        System.out.println("STEP 2: Event Details");
+                        line();
+                        System.out.println("  Event Name : " + ev.name);
+                        System.out.println("  Category   : " + ev.category);
+                        System.out.println("  City       : " + ev.city);
+                        System.out.println("  Date       : " + ev.date);
+                        System.out.println("  Organizer  : " + ev.organizer);
+                        System.out.println("  Price      : " + (ev.price == 0 ? "FREE" : "Rs." + ev.price + " per ticket"));
+                        System.out.println("  Total Seats: " + ev.capacity);
+                        System.out.println("  Registered : " + regs.size());
+                        System.out.println("  Seats Left : " + seatsLeft);
+                        line();
+
+                        // ── Check: Already Registered ─────────────
+                        boolean alreadyReg = false;
+                        for (String r : regs)
+                            if (r.startsWith(user + "|")) { alreadyReg = true; break; }
+                        if (alreadyReg) {
+                            System.out.println("  [!] You (" + user + ") are already registered for this event.");
+                            System.out.println("      Use option 4 to view your registration.");
+                            line();
+                            break;
+                        }
+
+                        // ── Check: Event Full ─────────────────────
+                        if (seatsLeft <= 0) {
+                            System.out.println("  [!] Sorry, this event is FULL. No seats available.");
+                            line();
+                            break;
+                        }
+
+                        // ── STEP 3: Enter Your Details ────────────
+                        line();
+                        System.out.println("STEP 3: Enter Your Details");
+                        line();
+                        System.out.println("  Name (logged in as): " + user);
+                        System.out.print("  Enter Phone Number : ");
+                        String phone = sc.nextLine().trim();
+                        if (phone.isEmpty()) phone = "Not provided";
+                        System.out.print("  Enter Email Address: ");
+                        String email = sc.nextLine().trim();
+                        if (email.isEmpty()) email = "Not provided";
+
+                        // ── STEP 4: Number of Tickets ─────────────
+                        line();
+                        System.out.println("STEP 4: Number of Tickets");
+                        line();
+                        System.out.println("  Seats available : " + seatsLeft);
+                        System.out.print("  How many tickets? (1-" + Math.min(seatsLeft, 10) + "): ");
+                        int tickets = 1;
+                        try {
+                            tickets = Integer.parseInt(sc.nextLine().trim());
+                            if (tickets < 1) { tickets = 1; }
+                            if (tickets > 10) {
+                                System.out.println("  [!] Max 10 tickets. Setting to 10.");
+                                tickets = 10;
+                            }
+                            if (tickets > seatsLeft) {
+                                System.out.println("  [!] Only " + seatsLeft + " seats left. Setting to " + seatsLeft + ".");
+                                tickets = seatsLeft;
+                            }
+                        } catch (NumberFormatException ex) {
+                            System.out.println("  Invalid. Defaulting to 1 ticket.");
+                            tickets = 1;
+                        }
+                        int totalCost = ev.price * tickets;
+
+                        // ── STEP 5: Confirm ───────────────────────
+                        line();
+                        System.out.println("STEP 5: Confirm Registration");
+                        line();
+                        System.out.println("  Name         : " + user);
+                        System.out.println("  Phone        : " + phone);
+                        System.out.println("  Email        : " + email);
+                        System.out.println("  Event        : " + ev.name);
+                        System.out.println("  City         : " + ev.city);
+                        System.out.println("  Date         : " + ev.date);
+                        System.out.println("  Tickets      : " + tickets);
+                        System.out.println("  Price/Ticket : " + (ev.price == 0 ? "FREE" : "Rs." + ev.price));
+                        System.out.println("  Total Cost   : " + (totalCost == 0 ? "FREE" : "Rs." + totalCost));
+                        System.out.println("  Seats Left   : " + seatsLeft + "  (after: " + (seatsLeft - tickets) + ")");
+                        line();
+                        System.out.print("  Confirm? (yes / no): ");
+                        String confirm = sc.nextLine().trim().toLowerCase();
+                        if (!confirm.equals("yes") && !confirm.equals("y")) {
+                            System.out.println("  Registration cancelled.");
+                            line();
+                            break;
+                        }
+
+                        // ── Process: CircularQueue + Stack ────────
+                        CircularQueue bookingQ = new CircularQueue(10);
+                        for (int t = 0; t < tickets; t++)
+                            bookingQ.enqueue(user + "|" + phone + "|" + email + "|T" + (t + 1));
+                        while (!bookingQ.isEmpty()) regs.add(bookingQ.dequeue());
+                        undoStack.push(ev);
+                        history.addToHistory(ev);
+
+                        // ── STEP 6: Booking Confirmation ──────────
+                        line();
+                        System.out.println("  *** REGISTRATION SUCCESSFUL! ***");
+                        line();
+                        System.out.println("  Booking Ref  : REG-" + String.format("%04d", id * 100 + regs.size()));
+                        System.out.println("  Name         : " + user);
+                        System.out.println("  Phone        : " + phone);
+                        System.out.println("  Email        : " + email);
+                        System.out.println("  Event        : " + ev.name);
+                        System.out.println("  City         : " + ev.city);
+                        System.out.println("  Date         : " + ev.date);
+                        System.out.println("  Tickets      : " + tickets);
+                        System.out.println("  Total Cost   : " + (totalCost == 0 ? "FREE" : "Rs." + totalCost));
+                        System.out.println("  Seats Left   : " + (seatsLeft - tickets));
+                        System.out.println("  [DSA] CircularQueue used for booking - O(1)");
+                        System.out.println("  [DSA] Stack saved for undo (option 7). Size: " + undoStack.size());
+                        line();
+
+                    } catch (NumberFormatException e) {
+                        System.out.println("  Invalid input. Please enter a number.");
+                        line();
+                    }
+                    break;
+                }
+
+                case 4: {
+                    line();
+                    System.out.println("VIEW REGISTRATIONS FOR EVENT");
+                    line();
+                    System.out.print("Enter Event ID: ");
+                    try {
+                        int id = Integer.parseInt(sc.nextLine().trim());
+                        Event ev = htoa.get(id);
+                        if (ev == null) {
+                            System.out.println("Event ID " + id + " not found.");
+                            break;
+                        }
+                        System.out.println("Event  : " + ev.name);
+                        System.out.println("City   : " + ev.city + "  |  Date: " + ev.date);
+                        System.out.println("[HashTable Open Addressing lookup - O(1) amortized]");
+                        line();
+                        List<String> regs = registrations.get(id);
+                        if (regs == null || regs.isEmpty()) {
+                            System.out.println("No registrations yet for this event.");
+                        } else {
+                            System.out.println("Registered users (" + regs.size() + " / " + ev.capacity + " capacity):");
+                            for (int i = 0; i < regs.size(); i++)
+                                System.out.println("  " + (i+1) + ". " + regs.get(i));
+                        }
+                    } catch (NumberFormatException e) {
+                        System.out.println("Invalid input. Please enter a number.");
+                    }
+                    line();
+                    break;
+                }
+
+                // ── 5. Sort Events ────────────────────────────────
+                case 5: {
+                    line();
+                    System.out.println("SORT EVENTS");
+                    line();
+                    System.out.println("  a. By Price    (Bubble Sort    - O(n^2))");
+                    System.out.println("  b. By Name     (Selection Sort - O(n^2))");
+                    System.out.println("  c. By Date     (Insertion Sort - O(n^2)/O(n) best)");
+                    System.out.println("  d. By Capacity (Merge Sort     - Theta(n log n))");
+                    System.out.println("  e. By ID       (Quick Sort     - O(n log n) avg)");
+                    System.out.println("  f. Empirical time comparison");
+                    System.out.println();
+                    System.out.print("Enter choice (a-f): ");
+                    String s = sc.nextLine().trim().toLowerCase();
+                    Event[] copy = EVENTS.clone();
+                    switch (s) {
+                        case "a":
+                            bubbleSort(copy);
+                            System.out.println("Sorted by Price ascending [Bubble Sort - O(n^2)]:");
+                            for (Event e : copy) System.out.println("  " + e);
+                            break;
+                        case "b":
+                            selectionSort(copy);
+                            System.out.println("Sorted by Name A-Z [Selection Sort - O(n^2)]:");
+                            for (Event e : copy) System.out.println("  " + e);
+                            break;
+                        case "c":
+                            insertionSort(copy);
+                            System.out.println("Sorted by Date ascending [Insertion Sort - O(n^2)]:");
+                            for (Event e : copy) System.out.println("  " + e);
+                            break;
+                        case "d":
+                            mergeSort(copy, 0, copy.length - 1);
+                            System.out.println("Sorted by Capacity descending [Merge Sort - Theta(n log n)]:");
+                            for (Event e : copy) System.out.println("  " + e);
+                            break;
+                        case "e":
+                            quickSort(copy, 0, copy.length - 1);
+                            System.out.println("Sorted by ID ascending [Quick Sort - O(n log n) avg]:");
+                            for (Event e : copy) System.out.println("  " + e);
+                            break;
+                        case "f":
+                            System.out.println("Empirical sort time:");
+                            measureSortTime(EVENTS, "Insertion");
+                            break;
+                        default:
+                            System.out.println("Invalid option. Choose a-f.");
+                    }
+                    line();
+                    break;
+                }
+
+                // ── 6. Filter Events ──────────────────────────────
+                case 6: {
+                    line();
+                    System.out.println("FILTER EVENTS");
+                    line();
+                    System.out.println("  a. By Category  (music/gaming/sports/education/arts)");
+                    System.out.println("  b. By City      (Mumbai/Delhi/Bengaluru/Hyderabad/Chennai/Pune/Kolkata/Goa)");
+                    System.out.println("  c. By Price Range");
+                    System.out.println("  d. Free Events only");
+                    System.out.println();
+                    System.out.print("Enter choice (a-d): ");
+                    String f = sc.nextLine().trim().toLowerCase();
+                    switch (f) {
+                        case "a": {
+                            System.out.print("Enter category: ");
+                            String cat = sc.nextLine().trim();
+                            List<Event> res = filterByCategory(EVENTS, cat);
+                            System.out.println("[LinkedList filter - O(n)]");
+                            if (res.isEmpty()) System.out.println("No events found for: " + cat);
+                            else res.forEach(e -> System.out.println("  " + e));
+                            break;
+                        }
+                        case "b": {
+                            System.out.print("Enter city: ");
+                            String city = sc.nextLine().trim();
+                            List<Event> res = cityMap.get(city);
+                            System.out.println("[HashTable Chaining lookup - O(1) avg]");
+                            if (res.isEmpty()) System.out.println("No events found in: " + city);
+                            else res.forEach(e -> System.out.println("  " + e));
+                            break;
+                        }
+                        case "c": {
+                            try {
+                                System.out.print("Enter min price (0 for FREE): ");
+                                int mn = Integer.parseInt(sc.nextLine().trim());
+                                System.out.print("Enter max price: ");
+                                int mx = Integer.parseInt(sc.nextLine().trim());
+                                Event[] sorted = EVENTS.clone();
+                                bubbleSort(sorted);
+                                List<Event> res = priceRangeFilter(sorted, mn, mx);
+                                System.out.println("[Binary Search boundaries - O(log n + k)]");
+                                if (res.isEmpty()) System.out.println("No events in range Rs." + mn + " to Rs." + mx);
+                                else res.forEach(e -> System.out.println("  " + e));
+                            } catch (NumberFormatException e) {
+                                System.out.println("Invalid price. Please enter numbers.");
+                            }
+                            break;
+                        }
+                        case "d": {
+                            System.out.println("Free Events [Linear scan - O(n)]:");
+                            boolean found = false;
+                            for (Event e : EVENTS) {
+                                if (e.price == 0) { System.out.println("  " + e); found = true; }
+                            }
+                            if (!found) System.out.println("No free events found.");
+                            break;
+                        }
+                        default:
+                            System.out.println("Invalid option. Choose a-d.");
+                    }
+                    line();
+                    break;
+                }
+
+                // ── 7. Undo Last Action ───────────────────────────
+                case 7: {
+                    line();
+                    System.out.println("UNDO LAST ACTION  [Stack pop - O(1)]");
+                    line();
+                    if (undoStack.isEmpty()) {
+                        System.out.println("Nothing to undo. Stack is empty.");
+                    } else {
+                        Event undone = undoStack.pop();
+                        System.out.println("Undone last action on: " + undone.name);
+                        System.out.println("Stack size after undo : " + undoStack.size());
+                        if (!undoStack.isEmpty())
+                            System.out.println("Previous action was on : " + undoStack.peek().name);
+                        else
+                            System.out.println("Stack is now empty.");
+                    }
+                    line();
+                    break;
+                }
+
+                // ── 8. Featured Events Carousel ───────────────────
+                case 8: {
+                    line();
+                    System.out.println("FEATURED EVENTS  [Circular Linked List]");
+                    line();
+                    carousel.display(4);
+                    line();
+                    break;
+                }
+
+                // ── 9. Browsing History ───────────────────────────
+                case 9: {
+                    line();
+                    System.out.println("BROWSING HISTORY  [Doubly Linked List traversal]");
+                    line();
+                    history.traverse();
+                    line();
+                    break;
+                }
+
+                // ── 10. Top Events by Capacity ────────────────────
+                case 10: {
+                    line();
+                    System.out.println("TOP EVENTS BY CAPACITY  [Max-Heap]");
+                    line();
+                    topKByCapacity(EVENTS, 5);
+                    line();
+                    break;
+                }
+
+                // ── 11. Cheapest Events (Min-Heap) ────────────────
+                case 11: {
+                    line();
+                    System.out.println("CHEAPEST EVENTS  [Min-Heap / PriorityQueue - O(log n) poll]");
+                    line();
+                    PriorityQueue<Event> minHeap = buildMinHeapByPrice(EVENTS);
+                    System.out.println("Top 5 cheapest events:");
+                    for (int i = 0; i < 5 && !minHeap.isEmpty(); i++) {
+                        Event e = minHeap.poll();
+                        System.out.printf("  #%d  %-38s  %s%n",
+                            i+1, e.name, e.price == 0 ? "FREE" : "Rs." + e.price);
+                    }
+                    line();
+                    break;
+                }
+
+                // ── 12. DSA Summary & Stats ───────────────────────
+                case 12: {
+                    line();
+                    System.out.println("DSA SUMMARY & STATS");
+                    line();
+                    long freeCount     = Arrays.stream(EVENTS).filter(e -> e.price == 0).count();
+                    long featuredCount = Arrays.stream(EVENTS).filter(e -> e.featured).count();
+                    long cityCount     = Arrays.stream(EVENTS).map(e -> e.city).collect(Collectors.toSet()).size();
+
+                    System.out.println("Total events        : " + EVENTS.length);
+                    System.out.println("Free events         : " + freeCount);
+                    System.out.println("Featured events     : " + featuredCount);
+                    System.out.println("Cities covered      : " + cityCount);
+                    System.out.println("SLL size            : " + catalog.size);
+                    System.out.println("SLL hasCycle        : " + catalog.hasCycle());
+                    System.out.printf ("HT (OA) load factor : %.2f%n", htoa.loadFactor());
+                    cityMap.printStats();
+                    System.out.println();
+                    System.out.println("Algorithms used:");
+                    System.out.println("  CO1: LinearSearch O(n), BinarySearch O(log n)");
+                    System.out.println("       BubbleSort O(n^2), SelectionSort O(n^2)");
+                    System.out.println("       InsertionSort O(n^2), MergeSort Theta(n log n)");
+                    System.out.println("       QuickSort O(n log n) avg");
+                    System.out.println("Data Structures used:");
+                    System.out.println("  CO2: Array, SinglyLinkedList, DoublyLinkedList, CircularLinkedList");
+                    System.out.println("  CO3: Stack, CircularQueue, Deque, MaxHeap, MinHeap");
+                    System.out.println("  CO4: HashTable(Chaining), HashTable(OpenAddressing), HashMap");
+                    line();
+                    break;
+                }
+
+                // ── 0. Exit ───────────────────────────────────────
+                case 0: {
+                    System.out.println();
+                    System.out.println("Thank you for using LocalPulse, " + user + "!");
+                    System.out.println("Goodbye.");
+                    running = false;
+                    break;
+                }
+
+                default:
+                    System.out.println("Invalid choice. Please enter a number from 0 to 12.");
+            }
+        }
+
+        sc.close();
+    }
+}
